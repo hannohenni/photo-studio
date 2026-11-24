@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f2">
+  <meta name="description" content="An offline-capable photo studio for batch sizing, white borders, RAW and HEIC conversion, and print-ready exports.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <title>Photo Studio</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #20211f;
+      --muted: #73756f;
+      --line: #e4e5df;
+      --paper: #ffffff;
+      --canvas: #f5f5f2;
+      --soft: #f8f8f5;
+      --accent: #315c4b;
+      --accent-dark: #244638;
+      --accent-soft: #e9f0eb;
+      --danger: #a4473c;
+      --shadow: 0 18px 55px rgba(25, 31, 25, .07);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--canvas);
+      padding: 42px 22px 64px;
+    }
+    .app { width: min(1040px, 100%); margin: 0 auto; }
+    header { margin-bottom: 28px; }
+    .header-tools { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+    .eyebrow { margin-bottom: 0; }
+    .pwa-tools { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .offline-state { color: var(--muted); font-size: 10px; }
+    .install-button, .offline-button { min-height: 32px; padding: 0 11px; border: 1px solid #dfe2dc; border-radius: 8px; background: #fff; color: var(--accent); font: inherit; font-size: 11px; font-weight: 680; cursor: pointer; }
+    .install-button:hover, .offline-button:hover:not(:disabled) { border-color: var(--accent); background: #f5f8f5; }
+    .install-button[hidden] { display: none; }
+    .offline-button:disabled { opacity: .55; cursor: wait; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--accent); font-size: 11px; font-weight: 750;
+      letter-spacing: .13em; text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 22px; height: 1px; background: currentColor; }
+    h1 { margin: 0; font-size: clamp(31px, 5vw, 45px); line-height: 1.08; letter-spacing: -.045em; font-weight: 680; }
+    .intro { max-width: 650px; margin: 13px 0 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.28fr) minmax(285px, .72fr); gap: 18px; align-items: start; }
+    .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 17px; box-shadow: var(--shadow); }
+    .panel-head { padding: 22px 23px 17px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .panel-title { margin: 0; font-size: 15px; letter-spacing: -.015em; font-weight: 700; }
+    .subtle { color: var(--muted); font-size: 12px; }
+    .upload-area {
+      margin: 0 19px 18px; min-height: 226px; border: 1.5px dashed #cdd4cc;
+      border-radius: 13px; background: #fbfcfa; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center; padding: 24px;
+      cursor: pointer; transition: border-color .18s, background .18s, transform .18s;
+    }
+    .upload-area:hover, .upload-area.dragover { border-color: var(--accent); background: #f3f8f4; }
+    .upload-area.dragover { transform: scale(.995); }
+    .upload-icon { width: 48px; height: 48px; border-radius: 15px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 14px; }
+    .upload-icon svg { width: 23px; height: 23px; }
+    .upload-main { font-weight: 650; font-size: 15px; }
+    .upload-secondary { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .browse { color: var(--accent); font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+    .file-area { border-top: 1px solid var(--line); padding: 15px 19px 18px; }
+    .file-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .file-count { font-size: 12px; color: var(--muted); }
+    .file-count strong { color: var(--ink); font-weight: 700; }
+    .text-button { border: 0; background: none; padding: 5px 0; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+    .text-button:hover { color: var(--danger); }
+    .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 9px; max-height: 375px; overflow: auto; padding-right: 2px; }
+    .file-card { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px; border: 1px solid #eceee9; border-radius: 10px; background: #fff; }
+    .thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; background: #f0f0ed; flex: 0 0 auto; }
+    .thumb-placeholder { width: 42px; height: 42px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 6px; background: #edf1ed; color: #52685a; font-size: 9px; font-weight: 800; letter-spacing: .04em; }
+    .file-meta { min-width: 0; flex: 1; }
+    .file-name { font-size: 11px; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-size { margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .remove-file { flex: 0 0 auto; border: 0; background: transparent; color: #969a92; cursor: pointer; padding: 3px; font-size: 17px; line-height: 1; }
+    .remove-file:hover { color: var(--danger); }
+    .settings { padding: 22px 22px 20px; }
+    .settings .panel-title { margin-bottom: 19px; }
+    .field { margin-bottom: 17px; }
+    .field:last-child { margin-bottom: 0; }
+    label { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 7px; font-size: 12px; font-weight: 650; }
+    .hint { color: var(--muted); font-size: 10px; font-weight: 450; }
+    select, input[type="number"] {
+      width: 100%; min-height: 42px; padding: 0 12px; color: var(--ink); background: #fff;
+      border: 1px solid #dfe2dc; border-radius: 9px; font: inherit; font-size: 13px; outline: none;
+    }
+    select:focus, input[type="number"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(49, 92, 75, .1); }
+    .two-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .unit-wrap { position: relative; }
+    .unit-wrap input { padding-right: 39px; }
+    .unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--muted); pointer-events: none; }
+    .quality-row { display: flex; align-items: center; gap: 12px; }
+    input[type="range"] { min-width: 0; flex: 1; accent-color: var(--accent); }
+    .quality-value { width: 35px; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .custom-size { display: none; margin-top: 10px; }
+    .custom-size.visible { display: grid; }
+    .explain { margin-top: 17px; padding: 12px; border-radius: 10px; background: var(--soft); color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .explain strong { color: #4f5e52; font-weight: 650; }
+    .bottom { margin-top: 18px; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .privacy { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .privacy svg { width: 17px; height: 17px; color: var(--accent); flex: 0 0 auto; }
+    .privacy-actions { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+    .offline-help { color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .primary {
+      min-height: 46px; padding: 0 20px; border: 0; border-radius: 10px; background: var(--accent);
+      color: #fff; font: inherit; font-size: 13px; font-weight: 680; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px; white-space: nowrap;
+      transition: background .18s, transform .18s, opacity .18s;
+    }
+    .primary:hover:not(:disabled) { background: var(--accent-dark); transform: translateY(-1px); }
+    .primary:disabled { opacity: .42; cursor: not-allowed; }
+    .primary svg { width: 17px; height: 17px; }
+    .progress-panel { display: none; margin-top: 14px; padding: 17px 20px; }
+    .progress-panel.visible { display: block; }
+    .progress-top { display: flex; align-items: center; justify-content: space-between; gap: 15px; font-size: 12px; }
+    .progress-top strong { font-weight: 680; }
+    .progress-track { height: 6px; overflow: hidden; border-radius: 99px; background: #edf0eb; margin-top: 12px; }
+    .progress-fill { width: 0; height: 100%; background: var(--accent); border-radius: inherit; transition: width .16s; }
+    .status { margin-top: 8px; color: var(--muted); font-size: 11px; }
+    .result { display: none; margin-top: 14px; padding: 17px 20px; align-items: center; justify-content: space-between; gap: 14px; }
+    .result.visible { display: flex; }
+    .result-title { font-size: 13px; font-weight: 700; }
+    .result-desc { margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .secondary { color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .secondary:hover { text-decoration: underline; }
+    .error { color: var(--danger); }
+    footer { text-align: center; margin-top: 24px; color: #969990; font-size: 10px; }
+    @media (max-width: 760px) {
+      body { padding: 28px 14px 45px; }
+      .layout { grid-template-columns: 1fr; }
+      .settings { order: -1; }
+      .bottom { align-items: stretch; flex-direction: column; }
+      .bottom .primary { width: 100%; }
+      .file-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    }
+    @media (max-width: 430px) {
+      .panel-head, .settings { padding-left: 17px; padding-right: 17px; }
+      .upload-area { margin-left: 13px; margin-right: 13px; }
+      .two-cols { gap: 7px; }
+      .result.visible { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div class="header-tools">
+        <div class="eyebrow">Batch photo processing</div>
+        <div class="pwa-tools">
+          <span class="offline-state" id="offlineState">Offline support is starting…</span>
+          <button class="install-button" id="installButton" type="button" hidden>Install app</button>
+        </div>
+      </div>
+      <h1>Photo Studio</h1>
+      <p class="intro">Prepare a batch of photos for printing. Add consistent white borders, choose a standard or custom print size—or keep each photo at its original pixel dimensions—set the resolution and output format, then download everything together as a ZIP. Supports JPG, PNG, WebP, HEIC, Canon CR2 and DNG files.</p>
+    </header>
+
+    <div class="layout">
+      <section class="panel" aria-labelledby="photos-title">
+        <div class="panel-head">
+          <h2 class="panel-title" id="photos-title">1. Add your photos</h2>
+          <span class="subtle">JPG · PNG · WebP · HEIC · CR2 · DNG</span>
+        </div>
+        <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif,.cr2,.dng" multiple hidden>
+        <div class="upload-area" id="dropZone" tabindex="0" role="button" aria-label="Choose photos or drop them here">
+          <div class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/><path d="M12 8v5m-2.5-2.5L12 8l2.5 2.5"/></svg>
+          </div>
+          <div class="upload-main">Drop your photos here</div>
+          <div class="upload-secondary">or <span class="browse">browse files</span><br>JPG, PNG, WebP, HEIC, Canon CR2 and DNG files are supported.</div>
+        </div>
+        <div class="file-area">
+          <div class="file-toolbar">
+            <div class="file-count"><strong id="fileCount">0 photos</strong> selected</div>
+            <button class="text-button" id="clearButton" type="button">Clear all</button>
+          </div>
+          <div class="file-grid" id="fileGrid" aria-live="polite">
+            <div class="subtle" id="emptyMessage">Your selected photos will appear here.</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel settings" aria-labelledby="settings-title">
+        <h2 class="panel-title" id="settings-title">2. Output settings</h2>
+        <div class="field">
+          <label for="sizePreset">Print size <span class="hint">orientation follows each photo</span></label>
+          <select id="sizePreset">
+            <option value="10x15">10 × 15 cm</option>
+            <option value="original">Original size (keep pixel dimensions)</option>
+            <option value="9x13">9 × 13 cm</option>
+            <option value="13x18">13 × 18 cm</option>
+            <option value="custom">Custom size…</option>
+          </select>
+          <div class="custom-size" id="customSize">
+            <div class="two-cols">
+              <div><label for="customWidth">Short side</label><div class="unit-wrap"><input id="customWidth" type="number" min="2" max="60" step="0.1" value="10"><span class="unit">cm</span></div></div>
+              <div><label for="customHeight">Long side</label><div class="unit-wrap"><input id="customHeight" type="number" min="2" max="60" step="0.1" value="15"><span class="unit">cm</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="borderWidth">White border <span class="hint">on each edge</span></label>
+          <div class="unit-wrap"><input id="borderWidth" type="number" min="0" max="30" step="0.5" value="5"><span class="unit">mm</span></div>
+        </div>
+        <div class="field">
+          <label for="dpi">Print resolution</label>
+          <select id="dpi">
+            <option value="300" selected>300 DPI — high quality</option>
+            <option value="240">240 DPI</option>
+            <option value="200">200 DPI — smaller files</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="outputFormat">Image file format</label>
+          <select id="outputFormat">
+            <option value="image/jpeg">JPEG</option>
+            <option value="image/png">PNG</option>
+            <option value="image/webp">WebP</option>
+          </select>
+        </div>
+        <div class="field" id="qualityField">
+          <label for="quality">Image quality <span class="hint">for JPEG / WebP</span></label>
+          <div class="quality-row">
+            <input id="quality" type="range" min="75" max="100" step="1" value="94">
+            <span class="quality-value" id="qualityValue">94%</span>
+          </div>
+        </div>
+        <div class="explain"><strong>No cropping.</strong> Each photo is scaled down to fit inside the border, keeping its original proportions. Extra white space is centered when the photo and print sizes have different aspect ratios. With <strong>Original size</strong>, the finished canvas keeps the source image’s pixel dimensions and the border is added inside those dimensions.</div>
+      </aside>
+    </div>
+
+    <section class="panel bottom">
+      <div class="privacy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg>
+        <div class="privacy-actions">
+          <span>Your photos stay on your device.<br>Images are processed locally.</span>
+          <button class="offline-button" id="prepareOfflineButton" type="button">Prepare offline support</button>
+          <span class="offline-help" id="offlineHelp">Caches the HEIC and RAW decoders for use without internet.</span>
+        </div>
+      </div>
+      <button class="primary" id="processButton" type="button" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4"/><path d="M5 17v3h14v-3"/></svg>
+        Process photos & create ZIP
+      </button>
+    </section>
+
+    <section class="panel progress-panel" id="progressPanel" aria-live="polite">
+      <div class="progress-top"><strong id="progressTitle">Preparing photos…</strong><span id="progressNumber">0 / 0</span></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="status" id="progressStatus">Starting…</div>
+    </section>
+
+    <section class="panel result" id="resultPanel">
+      <div><div class="result-title" id="resultTitle">Your photos are ready.</div><div class="result-desc" id="resultDesc">All processed images are in one ZIP file.</div></div>
+      <a class="secondary" id="downloadLink" href="#" download="bordered-photos.zip">Download ZIP ↓</a>
+    </section>
+
+    <footer>Photo Studio · Batch photo sizing, white borders and format conversion · Installable PWA · Photo processing stays on your device</footer>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+      const $ = (id) => document.getElementById(id);
+      const state = { files: [], busy: false, zipUrl: null };
+      const supportedExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'cr2', 'dng']);
+      let flashRawPromise = null;
+      let heic2anyPromise = null;
+
+      const fileInput = $('fileInput');
+      const dropZone = $('dropZone');
+      const fileGrid = $('fileGrid');
+      const processButton = $('processButton');
+      const outputFormat = $('outputFormat');
+
+      function formatBytes(bytes) {
+        if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+      }
+      function addFiles(fileList) {
+        const incoming = Array.from(fileList || []);
+        let added = 0;
+        let skipped = 0;
+        for (const file of incoming) {
+          const ext = getExtension(file.name);
+          if (!supportedExtensions.has(ext)) { skipped++; continue; }
+          const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          const isBrowserImage = ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+          state.files.push({ id, file, url: isBrowserImage ? URL.createObjectURL(file) : null, ext });
+          added++;
+        }
+        renderFiles();
+        if (incoming.length && !added) setStatus('No supported images found. Choose JPG, PNG, WebP, HEIC, CR2 or DNG files.', true);
+        else if (skipped) setStatus(`${skipped} unsupported file(s) skipped. Supported: JPG, PNG, WebP, HEIC, CR2 and DNG.`, true);
+        else if (added) clearStatus();
+      }
+      function getExtension(name) {
+        return String(name).toLowerCase().split('.').pop();
+      }
+      function inferType(name) {
+        const ext = getExtension(name);
+        return ({
+          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+          heic: 'image/heic', heif: 'image/heif', cr2: 'image/x-canon-cr2', dng: 'image/x-adobe-dng'
+        })[ext] || '';
+      }
+      function typeLabel(ext) {
+        return ({ jpeg: 'JPG', jpg: 'JPG', png: 'PNG', webp: 'WEBP', heic: 'HEIC', heif: 'HEIF', cr2: 'CR2 RAW', dng: 'DNG RAW' })[ext] || ext.toUpperCase();
+      }
+      function renderFiles() {
+        $('fileCount').textContent = `${state.files.length} photo${state.files.length === 1 ? '' : 's'}`;
+        processButton.disabled = state.files.length === 0 || state.busy;
+        $('emptyMessage')?.remove();
+        fileGrid.replaceChildren();
+        if (!state.files.length) {
+          const empty = document.createElement('div');
+          empty.className = 'subtle'; empty.id = 'emptyMessage'; empty.textContent = 'Your selected photos will appear here.';
+          fileGrid.append(empty);
+          return;
+        }
+        for (const item of state.files) {
+          const card = document.createElement('div');
+          card.className = 'file-card';
+          let thumb;
+          if (item.url) {
+            thumb = document.createElement('img');
+            thumb.className = 'thumb'; thumb.src = item.url; thumb.alt = '';
+          } else {
+            thumb = document.createElement('div');
+            thumb.className = 'thumb-placeholder'; thumb.textContent = typeLabel(item.ext);
+            thumb.setAttribute('aria-hidden', 'true');
+          }
+          const meta = document.createElement('div'); meta.className = 'file-meta';
+          const name = document.createElement('div'); name.className = 'file-name'; name.textContent = item.file.name; name.title = item.file.name;
+          const size = document.createElement('div'); size.className = 'file-size'; size.textContent = `${formatBytes(item.file.size)} · ${typeLabel(item.ext)}`;
+          const remove = document.createElement('button'); remove.className = 'remove-file'; remove.type = 'button'; remove.textContent = '×'; remove.title = `Remove ${item.file.name}`; remove.setAttribute('aria-label', remove.title);
+          remove.addEventListener('click', () => removeFile(item.id));
+          meta.append(name, size); card.append(thumb, meta, remove); fileGrid.append(card);
+        }
+      }
+      function removeFile(id) {
+        const index = state.files.findIndex((f) => f.id === id);
+        if (index !== -1) { if (state.files[index].url) URL.revokeObjectURL(state.files[index].url); state.files.splice(index, 1); renderFiles(); }
+      }
+      function clearFiles() {
+        for (const item of state.files) if (item.url) URL.revokeObjectURL(item.url);
+        state.files = []; renderFiles(); clearStatus();
+      }
+      function clearStatus() {
+        $('progressStatus').textContent = 'Starting…';
+        $('progressStatus').classList.remove('error');
+      }
+      function setStatus(message, isError = false) {
+        $('progressPanel').classList.add('visible');
+        $('progressStatus').textContent = message;
+        $('progressStatus').classList.toggle('error', isError);
+      }
+      function getDimensions() {
+        const preset = $('sizePreset').value;
+        if (preset === 'original') return { original: true };
+        if (preset === 'custom') {
+          return { width: Number($('customWidth').value), height: Number($('customHeight').value), original: false };
+        }
+        const [w, h] = preset.split('x').map(Number);
+        return { width: w, height: h, original: false };
+      }
+      function validateSettings() {
+        const dimensions = getDimensions();
+        const border = Number($('borderWidth').value);
+        if (!Number.isFinite(border) || border < 0 || border > 30) {
+          throw new Error('Enter a border width between 0 and 30 mm.');
+        }
+        if (!dimensions.original) {
+          const { width, height } = dimensions;
+          if (!Number.isFinite(width) || !Number.isFinite(height) || width < 2 || height < 2 || width > 60 || height > 60) {
+            throw new Error('Enter a print width and height between 2 and 60 cm.');
+          }
+          if (border * 2 >= Math.min(width, height) * 10) {
+            throw new Error('The border must be smaller than half the short side of the print.');
+          }
+          const dpi = Number($('dpi').value);
+          const pxW = Math.round(width / 2.54 * dpi);
+          const pxH = Math.round(height / 2.54 * dpi);
+          if (pxW * pxH > 80000000 || Math.max(pxW, pxH) > 12000) {
+            throw new Error('These settings create an image that is too large. Choose a smaller size or resolution.');
+          }
+        }
+        const dpi = Number($('dpi').value);
+        return { ...dimensions, border, dpi };
+      }
+      function loadNativeBitmap(file) {
+        if ('createImageBitmap' in window) {
+          return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(file));
+        }
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+          img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+          img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Could not open ${file.name}`)); };
+          img.src = url;
+        });
+      }
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          const existing = document.querySelector(`script[data-library-src="${src}"]`);
+          if (existing?.dataset.loaded === 'true') { resolve(); return; }
+          if (existing) {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', () => reject(new Error('Could not load an image decoder. Check your internet connection and try again.')), { once: true });
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = src; script.async = true; script.crossOrigin = 'anonymous'; script.dataset.librarySrc = src;
+          script.onload = () => { script.dataset.loaded = 'true'; resolve(); };
+          script.onerror = () => reject(new Error('Could not load an image decoder. Check your internet connection and try again.'));
+          document.head.append(script);
+        });
+      }
+      async function convertHeic(file) {
+        if (!heic2anyPromise) {
+          heic2anyPromise = loadScript('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js')
+            .then(() => {
+              if (typeof window.heic2any !== 'function') throw new Error('The HEIC decoder did not initialise correctly.');
+              return window.heic2any;
+            })
+            .catch((error) => { heic2anyPromise = null; throw error; });
+        }
+        const heic2any = await heic2anyPromise;
+        const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.96 });
+        return Array.isArray(converted) ? converted[0] : converted;
+      }
+      async function loadRawBitmap(file) {
+        if (!flashRawPromise) {
+          flashRawPromise = import('https://cdn.jsdelivr.net/npm/flashraw@0.4.0/dist/browser.js')
+            .then((module) => module.FlashRaw)
+            .catch((error) => {
+              flashRawPromise = null;
+              throw new Error(`Could not load the RAW decoder: ${error.message || error}`);
+            });
+        }
+        const FlashRaw = await flashRawPromise;
+        if (!FlashRaw) throw new Error('The RAW decoder is unavailable.');
+        const raw = await FlashRaw.open(file);
+        try {
+          const frame = await raw.decode({ output: 'rgba8', backend: 'auto' });
+          const canvas = document.createElement('canvas');
+          canvas.width = frame.width; canvas.height = frame.height;
+          const ctx = canvas.getContext('2d', { alpha: false });
+          if (!ctx) throw new Error('Your browser could not create an image canvas.');
+          const imageData = typeof frame.toImageData === 'function'
+            ? frame.toImageData()
+            : new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height);
+          ctx.putImageData(imageData, 0, 0);
+          return canvas;
+        } finally {
+          await raw.close();
+        }
+      }
+      async function loadBitmap(file) {
+        const ext = getExtension(file.name);
+        if (ext === 'cr2' || ext === 'dng') return loadRawBitmap(file);
+        if (ext === 'heic' || ext === 'heif') {
+          try {
+            return await loadNativeBitmap(file);
+          } catch (_) {
+            const converted = await convertHeic(file);
+            return loadNativeBitmap(converted);
+          }
+        }
+        return loadNativeBitmap(file);
+      }
+      function canvasBlob(canvas, mime, quality) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('The browser could not export an image.')), mime, quality);
+        });
+      }
+      async function renderPhoto(item, settings, mime, quality) {
+        const bitmap = await loadBitmap(item.file);
+        try {
+          let outW, outH, borderPx;
+          if (settings.original) {
+            outW = bitmap.width; outH = bitmap.height;
+            borderPx = settings.border / 10 / 2.54 * settings.dpi;
+            if (borderPx * 2 >= Math.min(outW, outH)) {
+              throw new Error(`The border is too wide for ${item.file.name} at its original dimensions. Reduce the border width.`);
+            }
+          } else {
+            const landscape = bitmap.width >= bitmap.height;
+            const shortCm = Math.min(settings.width, settings.height);
+            const longCm = Math.max(settings.width, settings.height);
+            outW = Math.round((landscape ? longCm : shortCm) / 2.54 * settings.dpi);
+            outH = Math.round((landscape ? shortCm : longCm) / 2.54 * settings.dpi);
+            borderPx = settings.border / 10 / 2.54 * settings.dpi;
+          }
+          if (outW * outH > 80000000 || Math.max(outW, outH) > 12000) {
+            throw new Error(`${item.file.name} is too large to process safely at these settings.`);
+          }
+          const innerW = outW - borderPx * 2;
+          const innerH = outH - borderPx * 2;
+          const scale = settings.original
+            ? Math.min(1, innerW / bitmap.width, innerH / bitmap.height)
+            : Math.min(innerW / bitmap.width, innerH / bitmap.height);
+          const drawW = bitmap.width * scale;
+          const drawH = bitmap.height * scale;
+          const x = (outW - drawW) / 2;
+          const y = (outH - drawH) / 2;
+          const canvas = document.createElement('canvas');
+          canvas.width = outW; canvas.height = outH;
+          const ctx = canvas.getContext('2d', { alpha: false });
+          if (!ctx) throw new Error('Your browser could not create an image canvas.');
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, outW, outH);
+          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(bitmap, x, y, drawW, drawH);
+          let blob = await canvasBlob(canvas, mime, quality);
+          canvas.width = 1; canvas.height = 1;
+          blob = await addResolutionMetadata(blob, mime, settings.dpi);
+          return blob;
+        } finally {
+          if (typeof bitmap.close === 'function') bitmap.close();
+        }
+      }
+      function crc32(bytes) {
+        let crc = -1;
+        for (let i = 0; i < bytes.length; i++) {
+          crc ^= bytes[i];
+          for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+        }
+        return (crc ^ -1) >>> 0;
+      }
+      // Canvas exports the requested pixel dimensions but generally writes 96-DPI metadata.
+      // Add the chosen print density to JPEG (JFIF) and PNG (pHYs) files as well.
+      async function addResolutionMetadata(blob, mime, dpi) {
+        if (mime !== 'image/jpeg' && mime !== 'image/png') return blob;
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        if (mime === 'image/jpeg' && bytes[0] === 0xFF && bytes[1] === 0xD8) {
+          const density = Math.max(1, Math.min(65535, Math.round(dpi)));
+          const jfif = new Uint8Array([0xFF,0xE0,0x00,0x10,0x4A,0x46,0x49,0x46,0x00,0x01,0x01,0x01,
+            (density >> 8) & 0xFF, density & 0xFF, (density >> 8) & 0xFF, density & 0xFF, 0x00, 0x00]);
+          let offset = 2, replaced = false;
+          while (offset + 4 <= bytes.length && bytes[offset] === 0xFF) {
+            const marker = bytes[offset + 1];
+            if (marker === 0xDA || marker === 0xD9) break;
+            const segmentLength = (bytes[offset + 2] << 8) | bytes[offset + 3];
+            if (segmentLength < 2 || offset + 2 + segmentLength > bytes.length) break;
+            const isJfif = marker === 0xE0 && bytes[offset + 4] === 0x4A && bytes[offset + 5] === 0x46 && bytes[offset + 6] === 0x49 && bytes[offset + 7] === 0x46 && bytes[offset + 8] === 0x00;
+            if (isJfif) {
+              const oldLength = segmentLength + 2;
+              const output = new Uint8Array(bytes.length - oldLength + jfif.length);
+              output.set(bytes.subarray(0, offset)); output.set(jfif, offset); output.set(bytes.subarray(offset + oldLength), offset + jfif.length);
+              return new Blob([output], { type: 'image/jpeg' });
+            }
+            offset += segmentLength + 2;
+          }
+          const output = new Uint8Array(bytes.length + jfif.length);
+          output.set(bytes.subarray(0, 2)); output.set(jfif, 2); output.set(bytes.subarray(2), 2 + jfif.length);
+          return new Blob([output], { type: 'image/jpeg' });
+        }
+        if (mime === 'image/png' && bytes.length > 33 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+          const ppm = Math.round(dpi / 0.0254);
+          const phys = new Uint8Array(21);
+          const view = new DataView(phys.buffer);
+          view.setUint32(0, 9, false);
+          phys.set([0x70,0x48,0x59,0x73], 4); // pHYs
+          view.setUint32(8, ppm, false); view.setUint32(12, ppm, false); phys[16] = 1;
+          const crcInput = phys.subarray(4, 17);
+          view.setUint32(17, crc32(crcInput), false);
+          let offset = 8, insertAt = -1, existingAt = -1, existingLength = 0;
+          while (offset + 12 <= bytes.length) {
+            const len = new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, false);
+            if (offset + 12 + len > bytes.length) break;
+            const type = String.fromCharCode(bytes[offset+4], bytes[offset+5], bytes[offset+6], bytes[offset+7]);
+            if (type === 'IHDR') insertAt = offset + 12 + len;
+            if (type === 'pHYs') { existingAt = offset; existingLength = 12 + len; break; }
+            offset += 12 + len;
+            if (type === 'IDAT') break;
+          }
+          if (existingAt >= 0) {
+            const output = new Uint8Array(bytes.length - existingLength + phys.length);
+            output.set(bytes.subarray(0, existingAt)); output.set(phys, existingAt); output.set(bytes.subarray(existingAt + existingLength), existingAt + phys.length);
+            return new Blob([output], { type: 'image/png' });
+          }
+          if (insertAt >= 0) {
+            const output = new Uint8Array(bytes.length + phys.length);
+            output.set(bytes.subarray(0, insertAt)); output.set(phys, insertAt); output.set(bytes.subarray(insertAt), insertAt + phys.length);
+            return new Blob([output], { type: 'image/png' });
+          }
+        }
+        return blob;
+      }
+      function dosDateTime(date = new Date()) {
+        const year = Math.max(1980, date.getFullYear());
+        const time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+        const day = ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+        return { time, day };
+      }
+      function zipHeader(nameBytes, crc, size, offset, central = false) {
+        const header = new Uint8Array(central ? 46 : 30);
+        const view = new DataView(header.buffer);
+        if (!central) {
+          view.setUint32(0, 0x04034b50, true); view.setUint16(4, 20, true);
+          view.setUint16(6, 0x0800, true); view.setUint16(8, 0, true);
+          const dt = dosDateTime(); view.setUint16(10, dt.time, true); view.setUint16(12, dt.day, true);
+          view.setUint32(14, crc, true); view.setUint32(18, size, true); view.setUint32(22, size, true);
+          view.setUint16(26, nameBytes.length, true); view.setUint16(28, 0, true);
+        } else {
+          view.setUint32(0, 0x02014b50, true); view.setUint16(4, 20, true); view.setUint16(6, 20, true);
+          view.setUint16(8, 0x0800, true); view.setUint16(10, 0, true);
+          const dt = dosDateTime(); view.setUint16(12, dt.time, true); view.setUint16(14, dt.day, true);
+          view.setUint32(16, crc, true); view.setUint32(20, size, true); view.setUint32(24, size, true);
+          view.setUint16(28, nameBytes.length, true); view.setUint16(30, 0, true); view.setUint16(32, 0, true);
+          view.setUint16(34, 0, true); view.setUint16(36, 0, true); view.setUint32(38, 0, true); view.setUint32(42, offset, true);
+        }
+        return header;
+      }
+      async function makeZip(entries) {
+        const parts = [];
+        const centralParts = [];
+        const encoder = new TextEncoder();
+        let offset = 0;
+        for (const entry of entries) {
+          const nameBytes = encoder.encode(entry.name);
+          const data = new Uint8Array(await entry.blob.arrayBuffer());
+          const crc = crc32(data);
+          const local = zipHeader(nameBytes, crc, data.length, offset, false);
+          parts.push(local, nameBytes, entry.blob);
+          const central = zipHeader(nameBytes, crc, data.length, offset, true);
+          centralParts.push(central, nameBytes);
+          offset += local.length + nameBytes.length + data.length;
+        }
+        const centralOffset = offset;
+        let centralSize = 0;
+        for (const part of centralParts) { parts.push(part); centralSize += part.length; }
+        const end = new Uint8Array(22);
+        const view = new DataView(end.buffer);
+        view.setUint32(0, 0x06054b50, true); view.setUint16(4, 0, true); view.setUint16(6, 0, true);
+        view.setUint16(8, entries.length, true); view.setUint16(10, entries.length, true);
+        view.setUint32(12, centralSize, true); view.setUint32(16, centralOffset, true); view.setUint16(20, 0, true);
+        parts.push(end);
+        return new Blob(parts, { type: 'application/zip' });
+      }
+      function cleanBaseName(name) {
+        return name.replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_').trim() || 'photo';
+      }
+      function getUniqueOutputName(originalName, extension, used) {
+        const base = cleanBaseName(originalName);
+        let candidate = `${base}-bordered.${extension}`;
+        let index = 2;
+        while (used.has(candidate.toLowerCase())) candidate = `${base}-bordered-${index++}.${extension}`;
+        used.add(candidate.toLowerCase());
+        return candidate;
+      }
+      function setProgress(done, total, message) {
+        $('progressNumber').textContent = `${done} / ${total}`;
+        $('progressFill').style.width = `${total ? done / total * 100 : 0}%`;
+        $('progressStatus').textContent = message;
+      }
+      async function processBatch() {
+        if (state.busy || !state.files.length) return;
+        let settings;
+        try { settings = validateSettings(); }
+        catch (error) { setStatus(error.message, true); return; }
+
+        state.busy = true;
+        renderFiles();
+        $('resultPanel').classList.remove('visible');
+        $('progressPanel').classList.add('visible');
+        $('progressTitle').textContent = 'Creating bordered photos…';
+        $('progressStatus').classList.remove('error');
+        setProgress(0, state.files.length, 'Preparing the first photo…');
+        const mime = outputFormat.value;
+        const extension = mime === 'image/jpeg' ? 'jpg' : mime === 'image/png' ? 'png' : 'webp';
+        const quality = Number($('quality').value) / 100;
+        const entries = [];
+        const usedNames = new Set();
+        const filesToProcess = [...state.files];
+        try {
+          for (let i = 0; i < filesToProcess.length; i++) {
+            const item = filesToProcess[i];
+            setProgress(i, filesToProcess.length, `Processing ${item.file.name}`);
+            const blob = await renderPhoto(item, settings, mime, quality);
+            // Some browsers may fall back to PNG when a requested canvas format is unsupported.
+            const actualExtension = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+            const name = getUniqueOutputName(item.file.name, actualExtension || extension, usedNames);
+            entries.push({ name, blob });
+            setProgress(i + 1, filesToProcess.length, `Finished ${item.file.name}`);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          $('progressTitle').textContent = 'Packing your ZIP file…';
+          setProgress(filesToProcess.length, filesToProcess.length, 'Building one download with all processed photos…');
+          const zipBlob = await makeZip(entries);
+          if (state.zipUrl) URL.revokeObjectURL(state.zipUrl);
+          state.zipUrl = URL.createObjectURL(zipBlob);
+          const size = getDimensions();
+          const label = size.original ? 'Original pixel dimensions' : `${size.width}x${size.height}cm`;
+          const fileLabel = size.original ? 'original-size' : `${size.width}x${size.height}cm`;
+          const zipName = `bordered-photos-${fileLabel}.zip`;
+          const link = $('downloadLink');
+          link.href = state.zipUrl; link.download = zipName;
+          $('resultTitle').textContent = `${entries.length} bordered photo${entries.length === 1 ? '' : 's'} ready`;
+          $('resultDesc').textContent = `${label} · ${$('borderWidth').value} mm border · ${$('dpi').value} DPI · ${extension.toUpperCase()} files · ZIP size ${formatBytes(zipBlob.size)}`;
+          $('resultPanel').classList.add('visible');
+          $('progressTitle').textContent = 'All done';
+          setProgress(filesToProcess.length, filesToProcess.length, 'Your original photos have not been changed.');
+        } catch (error) {
+          console.error(error);
+          $('progressTitle').textContent = 'Could not finish';
+          setStatus(error && error.message ? error.message : 'Something went wrong while processing the photos.', true);
+        } finally {
+          state.busy = false;
+          renderFiles();
+        }
+      }
+
+      const OFFLINE_DECODER_ASSETS = [
+        'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js',
+        'https://cdn.jsdelivr.net/npm/flashraw@0.4.0/dist/browser.js',
+        'https://cdn.jsdelivr.net/npm/flashraw@0.4.0/dist/flashraw_simd.wasm',
+        'https://cdn.jsdelivr.net/npm/flashraw@0.4.0/dist/flashraw.wasm',
+        'https://cdn.jsdelivr.net/npm/flashraw@0.4.0/dist/flashraw_simd_jxl.wasm'
+      ];
+      let installPromptEvent = null;
+
+      async function prepareOfflineSupport() {
+        const button = $('prepareOfflineButton');
+        const help = $('offlineHelp');
+        if (!('serviceWorker' in navigator) || !window.isSecureContext) {
+          help.textContent = 'Offline caching requires the app to be hosted over HTTPS (GitHub Pages supports this).';
+          return;
+        }
+        button.disabled = true;
+        let completed = 0;
+        try {
+          await navigator.serviceWorker.ready;
+          if (!navigator.serviceWorker.controller) {
+            await new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
+          }
+          for (const url of OFFLINE_DECODER_ASSETS) {
+            const name = url.split('/').pop();
+            help.textContent = `Caching ${name} (${completed + 1}/${OFFLINE_DECODER_ASSETS.length})…`;
+            const response = await fetch(url, { mode: 'cors' });
+            if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
+            // Consume the body. The service worker stores a cloned response in Cache Storage.
+            await response.arrayBuffer();
+            completed++;
+          }
+          help.textContent = 'Initialising the image decoders…';
+          await loadScript(OFFLINE_DECODER_ASSETS[0]);
+          if (typeof window.heic2any !== 'function') throw new Error('HEIC decoder did not initialise.');
+          heic2anyPromise = Promise.resolve(window.heic2any);
+          const rawModule = await import(OFFLINE_DECODER_ASSETS[1]);
+          if (!rawModule.FlashRaw) throw new Error('RAW decoder did not initialise.');
+          flashRawPromise = Promise.resolve(rawModule.FlashRaw);
+          help.textContent = 'Offline support is prepared. HEIC, CR2 and DNG decoders are cached on this device.';
+          $('offlineState').textContent = 'Offline-ready';
+        } catch (error) {
+          console.error(error);
+          help.textContent = `Could not cache every decoder (${completed}/${OFFLINE_DECODER_ASSETS.length}). Connect to the internet and try again.`;
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      async function registerPwa() {
+        if (!('serviceWorker' in navigator) || !window.isSecureContext) {
+          $('offlineState').textContent = 'Use HTTPS for offline mode';
+          return;
+        }
+        try {
+          await navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' });
+          await navigator.serviceWorker.ready;
+          $('offlineState').textContent = navigator.onLine ? 'Offline app shell ready' : 'Offline mode';
+        } catch (error) {
+          console.error('Service worker registration failed:', error);
+          $('offlineState').textContent = 'Offline setup unavailable';
+        }
+      }
+
+      window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        installPromptEvent = event;
+        $('installButton').hidden = false;
+      });
+      $('installButton').addEventListener('click', async () => {
+        if (!installPromptEvent) return;
+        installPromptEvent.prompt();
+        await installPromptEvent.userChoice;
+        installPromptEvent = null;
+        $('installButton').hidden = true;
+      });
+      window.addEventListener('appinstalled', () => {
+        $('installButton').hidden = true;
+        $('offlineState').textContent = 'App installed · offline-ready';
+      });
+      window.addEventListener('online', () => $('offlineState').textContent = 'Online · offline cache available');
+      window.addEventListener('offline', () => $('offlineState').textContent = 'Offline mode');
+      $('prepareOfflineButton').addEventListener('click', prepareOfflineSupport);
+      registerPwa();
+
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fileInput.click(); }
+      });
+      fileInput.addEventListener('change', (event) => { addFiles(event.target.files); fileInput.value = ''; });
+      $('clearButton').addEventListener('click', clearFiles);
+      processButton.addEventListener('click', processBatch);
+      for (const eventName of ['dragenter', 'dragover']) dropZone.addEventListener(eventName, (event) => { event.preventDefault(); dropZone.classList.add('dragover'); });
+      for (const eventName of ['dragleave', 'drop']) dropZone.addEventListener(eventName, (event) => { event.preventDefault(); dropZone.classList.remove('dragover'); });
+      dropZone.addEventListener('drop', (event) => addFiles(event.dataTransfer.files));
+      $('sizePreset').addEventListener('change', () => $('customSize').classList.toggle('visible', $('sizePreset').value === 'custom'));
+      $('quality').addEventListener('input', () => $('qualityValue').textContent = `${$('quality').value}%`);
+      outputFormat.addEventListener('change', () => $('qualityField').style.opacity = outputFormat.value === 'image/png' ? '.45' : '1');
+      window.addEventListener('beforeunload', () => {
+        for (const item of state.files) if (item.url) URL.revokeObjectURL(item.url);
+        if (state.zipUrl) URL.revokeObjectURL(state.zipUrl);
+      });
+    })();
+  </script>
+</body>
+</html>
