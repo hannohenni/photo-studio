@@ -1,6 +1,6 @@
 # Photo Studio — Progressive Web App
 
-Photo Studio is a browser-based batch photo tool. It can be installed as an app and keeps its application files available offline after the first online visit.
+Photo Studio is a browser-based batch photo tool. It can be installed as an app, follows your device’s light or dark appearance automatically, and keeps its application files available offline after the first online visit.
 
 ## Publish on GitHub Pages
 
@@ -29,13 +29,17 @@ The manifest and service worker use relative paths, so both a user/organization 
 
 The HEIC/RAW decoder libraries are downloaded from jsDelivr the first time offline support is prepared. The service worker caches them locally; the photo files themselves are never sent to a server. If you skip decoder preparation, standard browser-readable formats (JPG, PNG and WebP) still work offline, but HEIC/RAW decoding may require an internet connection until its decoder assets have been cached.
 
+## Appearance
+
+The interface automatically follows the device or browser setting for light and dark appearance. Change your system appearance setting and Photo Studio switches with it; there is no separate theme setting to manage.
+
 ## Install
 
 On supported browsers, use the **Install app** button when it appears. On iPhone/iPad, open the site in Safari, use **Share → Add to Home Screen**. The browser only offers installation after the site has been served from HTTPS and its PWA requirements are met.
 
 ## Updating the app
 
-When you publish a new version, change `CACHE_VERSION` in `sw.js` (for example, from `photo-studio-v1` to `photo-studio-v2`). The new service worker will install a fresh app-shell cache and remove the previous Photo Studio cache after activation.
+When you publish a new version, change `CACHE_VERSION` in `sw.js` whenever you publish another update (for example, from `photo-studio-v2` to `photo-studio-v3`). The new service worker will install a fresh app-shell cache and remove the previous Photo Studio cache after activation.
 
 ## Privacy
 

@@ -1,5 +1,5 @@
 /* Photo Studio PWA service worker — cache-first app shell + runtime CDN cache. */
-const CACHE_VERSION = 'photo-studio-v1';
+const CACHE_VERSION = 'photo-studio-v2';
 const CORE_CACHE = `${CACHE_VERSION}-core`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const CORE_FILES = [
